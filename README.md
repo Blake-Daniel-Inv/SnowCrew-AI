@@ -3,7 +3,7 @@
 ![CI](https://github.com/Blake-Daniel-Inv/SnowCrew-AI/actions/workflows/ci.yml/badge.svg)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Standalone local Next.js app for building and managing CrewAI-style agents, tasks, crews, and Snowflake connections.
+A standalone Next.js app for building and managing CrewAI-style agents, tasks, crews, and Snowflake connections — run it locally for development or deploy it to Snowflake Container Services for production.
 
 ## What It Does
 
@@ -13,7 +13,11 @@ Standalone local Next.js app for building and managing CrewAI-style agents, task
 - Exports starter `agents.yaml`, `tasks.yaml`, `crew.py`, `.env.example`
 - Stores app data locally in `~/.crewai-studio-local/` (overridable via `DATA_DIR` for container/SPCS deployments)
 
-## Run It
+## Running It
+
+### Development (Local)
+
+For local development and trying it out:
 
 ```bash
 git clone https://github.com/Blake-Daniel-Inv/SnowCrew-AI.git
@@ -24,14 +28,35 @@ npm run dev
 
 Then open [http://localhost:3000](http://localhost:3000).
 
-Production build:
+To verify a production build locally:
 
 ```bash
-git clone https://github.com/Blake-Daniel-Inv/SnowCrew-AI.git
-cd SnowCrew-AI
 npm run build
 npm start
 ```
+
+### Production (Snowflake Container Services)
+
+In production, SnowCrew AI runs as a [Snowpark Container Services (SPCS)](https://docs.snowflake.com/en/developer-guide/snowpark-container-services/overview) service inside your Snowflake account. The high-level flow:
+
+1. **Provision** the Cortex role, database, image repository, stage, compute pool, and secrets. Run [`snowflake/setup-cortex-role.sql`](snowflake/setup-cortex-role.sql) and [`snowflake/setup.sql`](snowflake/setup.sql) — see [`docs/OPERATIONS.md` §1](docs/OPERATIONS.md) for the full walkthrough, including the `SNOWFLAKE_PAT` and `CREDENTIALS_MASTER_KEY` secrets ([snowflake/PAT-SETUP.md](snowflake/PAT-SETUP.md)).
+2. **Authenticate** to your account's image registry:
+   ```bash
+   docker login <org>-<account>.registry.snowflakecomputing.com -u <snowflake_user>
+   ```
+3. **Build, push, and deploy** the service:
+   ```bash
+   ./snowflake/deploy.sh <image_repository_url>
+   ```
+4. **Wait until the service is ready**, then health-check it:
+   ```sql
+   SELECT SYSTEM$GET_SERVICE_STATUS('CREWAI_STUDIO_SVC');  -- wait for READY
+   ```
+   ```bash
+   curl -sf "https://<your-ingress-host>/api/health/ready"
+   ```
+
+The service spec is [`snowflake/spec.yaml`](snowflake/spec.yaml), and app data is persisted to `DATA_DIR` (a mounted stage) rather than `~/.crewai-studio-local/`. The complete runbook — secrets, GitHub OAuth setup, backups, secret rotation, and debugging — lives in [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
 
 ## Integrations
 
