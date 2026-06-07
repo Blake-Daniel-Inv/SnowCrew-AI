@@ -1,0 +1,80 @@
+spec:
+  containers:
+    - name: crewai-studio
+      image: <REGISTRY>/crewai_studio/app/crewai_studio_repo/crewai-studio:placeholder
+      env:
+        NODE_ENV: production
+        CONTAINER_MODE: "1"
+        DATA_DIR: /data
+        PORT: "3000"
+        # Pin to the venv we baked into the image so the runner never
+        # accidentally picks up a system python without crewai.
+        CREW_PYTHON_BIN: /opt/crewai/bin/python3
+        # Internal Snowflake host. The readiness probe (PR 33) requires
+        # this in container mode so REST calls can short-circuit External
+        # Access Integration. SPCS auto-injects SNOWFLAKE_ACCOUNT but not
+        # SNOWFLAKE_HOST — operator must replace the placeholder with the
+        # `<org>-<account>.snowflakecomputing.com` form before deploy.
+        SNOWFLAKE_HOST: "<ORG>-<ACCOUNT>.snowflakecomputing.com"
+      # Hybrid auth model:
+      #   - Cortex inference (assistant + LLM calls) uses the SPCS OAuth
+      #     session token at /snowflake/session/token. No PAT needed.
+      #   - The Snowflake Python connector behind crewai-tools'
+      #     SnowflakeSearchTool only accepts password/private_key auth —
+      #     SnowflakeConfig doesn't expose `authenticator='oauth'`. Until
+      #     that changes upstream, we still need a PAT for that one path.
+      #     Same secret object can be used; rotate via ALTER SECRET.
+      #   - CREDENTIALS_MASTER_KEY is required by the encrypted credentials
+      #     store (PR 1 envelope crypto). Without it, /api/health/ready
+      #     returns 503 and SPCS bounces the container forever (PR 33).
+      secrets:
+        - snowflakeSecret: CREWAI_STUDIO.APP.SNOWFLAKE_CREWAI_PAT_SECRET
+          secretKeyRef: secret_string
+          envVarName: SNOWFLAKE_PAT
+        - snowflakeSecret: CREWAI_STUDIO.APP.CREDENTIALS_MASTER_KEY_SECRET
+          secretKeyRef: secret_string
+          envVarName: CREDENTIALS_MASTER_KEY
+      resources:
+        # Bumped from 1/2/2/4 in PR 33: a single crew run already
+        # consumes 1.2-2 GB across the Python subprocess + LiteLLM
+        # client buffers + the Next.js worker holding the SSE stream.
+        # 4 GB request leaves headroom for a single concurrent run on a
+        # cold-started compute pool; 8 GB limit covers 2-3 parallel runs.
+        requests:
+          cpu: 2
+          memory: 4G
+        limits:
+          cpu: 4
+          memory: 8G
+      volumeMounts:
+        - name: workspace-data
+          mountPath: /data
+      # PR 33: readiness probe wired to /api/health/ready which checks
+      # SQLite, env vars, and the master key. `/` always returned 200
+      # even when the DB was wedged or the master key missing — SPCS
+      # would happily route traffic to a broken container.
+      readinessProbe:
+        port: 3000
+        path: /api/health/ready
+        initialDelaySeconds: 15
+        periodSeconds: 10
+        failureThreshold: 6
+      # PR 33: liveness probe so SPCS restarts a wedged container instead
+      # of indefinitely routing 500s to it. The /live endpoint is a
+      # process-only check (no DB / env dependencies), so a transient DB
+      # blip doesn't trigger a kill.
+      livenessProbe:
+        port: 3000
+        path: /api/health/live
+        initialDelaySeconds: 30
+        periodSeconds: 30
+        failureThreshold: 3
+  endpoints:
+    - name: crewai-ui
+      port: 3000
+      public: true
+  volumes:
+    - name: workspace-data
+      source: "@CREWAI_STUDIO.APP.CREWAI_DATA/workspaces"
+      uid: 1001
+      gid: 1001

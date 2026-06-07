@@ -1,0 +1,48 @@
+# Dependabot configuration.
+#
+# Two ecosystems are watched:
+#   1. npm        — application dependencies in /package.json
+#   2. github-actions — version pins in /.github/workflows
+#
+# Why grouping? Without grouping, every transitive minor/patch bump opens
+# its own PR, drowning reviewers. Security advisories are intentionally
+# excluded from groups so they always surface as their own PR for triage.
+#
+# Reviewers are intentionally left blank — assign via .github/CODEOWNERS
+# in a future PR rather than hard-coding GitHub handles here.
+
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+    groups:
+      npm-minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+    # Security advisories (applies-to: security-updates) are not grouped —
+    # they fall through to individual PRs so each CVE gets its own review.
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+    groups:
+      github-actions-all:
+        patterns:
+          - "*"

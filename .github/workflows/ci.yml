@@ -1,0 +1,67 @@
+# Continuous integration for SnowCrewAI.
+#
+# Runs on:
+#   - pull_request (any base branch) — gates every PR
+#   - push to main                   — sanity-checks merges
+#
+# Concurrency: a fresh push to the same ref cancels in-flight runs so
+# we don't waste runner minutes on stale commits.
+#
+# The audit step is intentionally last so that lint/type/test/build
+# failures surface before a transitive CVE blocks the build.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Lint, type-check, test, build, audit
+    runs-on: ubuntu-latest
+    env:
+      # Provided so any module that reads it during the Next.js build's
+      # static analysis pass (server route bundling) finds a value.
+      # NOT a real key — never used to encrypt real data. The runtime
+      # loader in src/lib/crypto/envelope.ts also tolerates absence, but
+      # supplying a dummy here keeps logs free of confusing "missing key"
+      # warnings should any code path lazily probe at build time.
+      CREDENTIALS_MASTER_KEY: ci-build-only-not-secure-do-not-use-in-prod-0123456789abcdef
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20.19.0
+          cache: npm
+
+      - name: Install dependencies (npm ci)
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check (tsc --noEmit)
+        run: npx tsc --noEmit
+
+      - name: Unit tests (vitest)
+        run: npx vitest run --reporter=verbose
+
+      - name: Production build (next build)
+        run: npx next build
+
+      # Audit runs LAST so all correctness signals come first.
+      # --omit=dev: only flag production deps (devDeps don't ship).
+      # --audit-level=high: fail on high/critical CVEs only — moderate
+      # advisories surface in Dependabot security PRs without blocking
+      # the build.
+      - name: npm audit (production deps, high+)
+        run: npm audit --audit-level=high --omit=dev
