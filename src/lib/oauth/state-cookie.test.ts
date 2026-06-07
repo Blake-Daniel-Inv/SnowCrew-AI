@@ -31,8 +31,8 @@ describe('signStatePayload / verifyStatePayload', () => {
 
   it('round-trips userIds with non-ASCII and email-shaped values', () => {
     const cases = [
-      'blake.daniel@adventhealth.com',
-      'BLAKE_DANIEL',
+      'jane.doe@example.com',
+      'JANE_DOE',
       'user.with.中文',
       'user@example.com',
     ];
