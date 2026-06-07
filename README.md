@@ -3,7 +3,7 @@
 ![CI](https://github.com/Blake-Daniel-Inv/SnowCrew-AI/actions/workflows/ci.yml/badge.svg)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A standalone Next.js app for building and managing CrewAI-style agents, tasks, crews, and Snowflake connections — run it locally for development or deploy it to Snowflake Container Services for production.
+**SnowCrew AI** is an open-source, visual **no-code studio for building, running, and exporting multi-agent [CrewAI](https://github.com/crewAIInc/crewAI) workflows.** Design agents, tasks, and crews on a drag-and-drop canvas, wire them to **Snowflake Cortex** LLMs and data plus integrations like GitHub, then export ready-to-run `crew.py` / YAML. Run it locally for development, or deploy it to **Snowflake Container Services (SPCS)** for production.
 
 ## What It Does
 
