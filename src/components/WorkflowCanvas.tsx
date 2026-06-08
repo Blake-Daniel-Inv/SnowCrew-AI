@@ -616,7 +616,7 @@ export function WorkflowCanvas({
   }, []);
 
   const handleNodeDragStop = useCallback(
-    (_event: MouseEvent, node: Node, draggedNodes: Node[]) => {
+    (_event: MouseEvent | TouchEvent, node: Node, draggedNodes: Node[]) => {
       isDragging.current = false;
       const nodeUpdates: Record<string, { x: number; y: number }> = {};
       for (const n of draggedNodes) {
