@@ -35,7 +35,7 @@ jobs:
       CREDENTIALS_MASTER_KEY: ci-build-only-not-secure-do-not-use-in-prod-0123456789abcdef
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
